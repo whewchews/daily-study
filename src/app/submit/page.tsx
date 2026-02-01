@@ -9,11 +9,14 @@ export const dynamic = 'force-dynamic'
 export default async function SubmitPage({
   searchParams,
 }: {
-  searchParams?: { seasonId?: string | string[] }
+  searchParams?: Promise<{ seasonId?: string | string[]; problemId?: string | string[] }>
 }) {
   const session = await getServerSession(authOptions)
+  const resolvedParams = await searchParams
   const selectedSeasonId =
-    typeof searchParams?.seasonId === 'string' ? searchParams.seasonId : undefined
+    typeof resolvedParams?.seasonId === 'string' ? resolvedParams.seasonId : undefined
+  const selectedProblemId =
+    typeof resolvedParams?.problemId === 'string' ? resolvedParams.problemId : undefined
 
   const activeSeasons = await prisma.season.findMany({
     where: { isActive: true },
@@ -52,6 +55,7 @@ export default async function SubmitPage({
           <SubmitForm
             seasons={seasons}
             defaultSeasonId={selectedSeasonId}
+            defaultProblemId={selectedProblemId}
             initialGithubUsername={session?.user?.githubUsername || ''}
             initialEmail={session?.user?.email || ''}
           />

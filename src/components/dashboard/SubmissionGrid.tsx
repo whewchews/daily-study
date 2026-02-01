@@ -1,7 +1,8 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { ProblemSubmissionsViewer } from '@/components/seasons/ProblemSubmissionsViewer'
+import { ParticipantSubmissionsViewer } from '@/components/dashboard/ParticipantSubmissionsViewer'
 
 type ProblemType = 'REGULAR' | 'FREE' | 'REST'
 
@@ -21,17 +22,50 @@ interface Participant {
   submittedProblemIds: string[]
 }
 
+interface SelectedProblemOption {
+  id: string
+  title: string
+}
+
+interface SelectedParticipantOption {
+  id: string
+  name: string
+  email?: string | null
+  githubUsername?: string | null
+}
+
+const buildProblemTitle = (problem: Problem) =>
+  `Day ${problem.dayNumber}: ${problem.title}`
+
 export function SubmissionGrid({
   problems,
   participants,
+  initialProblemId,
 }: {
   problems: Problem[]
   participants: Participant[]
+  initialProblemId?: string
 }) {
-  const [selectedProblem, setSelectedProblem] = useState<{
-    id: string
-    title: string
-  } | null>(null)
+  const initialProblemSelection = useMemo(() => {
+    if (!initialProblemId) return null
+    const targetProblem = problems.find(
+      (problem) => problem.id === initialProblemId && problem.problemType !== "REST"
+    )
+    if (!targetProblem) return null
+    return {
+      id: targetProblem.id,
+      title: buildProblemTitle(targetProblem),
+    }
+  }, [initialProblemId, problems])
+
+  const [selectedProblem, setSelectedProblem] = useState<SelectedProblemOption | null>(
+    initialProblemSelection
+  )
+  const [selectedParticipant, setSelectedParticipant] = useState<SelectedParticipantOption | null>(null)
+
+  useEffect(() => {
+    setSelectedProblem(initialProblemSelection)
+  }, [initialProblemSelection])
 
   // Get today's date at midnight for comparison
   const today = new Date()
@@ -73,7 +107,7 @@ export function SubmissionGrid({
                       if (problem.problemType !== 'REST') {
                         setSelectedProblem({
                           id: problem.id,
-                          title: `Day ${problem.dayNumber}: ${problem.title}`,
+                          title: buildProblemTitle(problem),
                         })
                       }
                     }}
@@ -127,14 +161,27 @@ export function SubmissionGrid({
                   isDatePast(p.assignedDate) && !participant.submittedProblemIds.includes(p.id)
                 ).length
 
+                const participantName = participant.githubUsername || participant.email || '알 수 없음'
+
                 return (
-                  <tr key={participant.id} className="hover:bg-gray-50">
-                    <td className="px-4 py-3 whitespace-nowrap sticky left-0 bg-white z-10">
+                  <tr
+                    key={participant.id}
+                    onClick={() => setSelectedParticipant({
+                      id: participant.id,
+                      name: participantName,
+                      email: participant.email,
+                      githubUsername: participant.githubUsername,
+                    })}
+                    className="hover:bg-gray-50 cursor-pointer"
+                    title="클릭하여 제출 내역 보기"
+                  >
+                    <td className="px-4 py-3 whitespace-nowrap sticky left-0 bg-white z-10 group-hover:bg-gray-50">
                       {participant.githubUsername ? (
                         <a
                           href={`https://github.com/${participant.githubUsername}`}
                           target="_blank"
                           rel="noopener noreferrer"
+                          onClick={(e) => e.stopPropagation()}
                           className="text-sm font-medium text-blue-600 hover:underline"
                         >
                           {participant.githubUsername}
@@ -233,6 +280,16 @@ export function SubmissionGrid({
           problemId={selectedProblem.id}
           problemTitle={selectedProblem.title}
           onClose={() => setSelectedProblem(null)}
+        />
+      )}
+
+      {selectedParticipant && (
+        <ParticipantSubmissionsViewer
+          participantId={selectedParticipant.id}
+          participantName={selectedParticipant.name}
+          participantEmail={selectedParticipant.email}
+          participantGithubUsername={selectedParticipant.githubUsername}
+          onClose={() => setSelectedParticipant(null)}
         />
       )}
     </>

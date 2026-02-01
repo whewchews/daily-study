@@ -39,23 +39,30 @@ interface Submission {
   code: string;
   language: string;
   submittedAt: string;
-  participant: {
-    githubUsername?: string | null;
-    email?: string | null;
+  problem: {
+    id: string;
+    dayNumber: number;
+    title: string;
+    assignedDate: string;
+    problemType: string;
   };
 }
 
-interface ProblemSubmissionsViewerProps {
-  problemId: string;
-  problemTitle: string;
+interface ParticipantSubmissionsViewerProps {
+  participantId: string;
+  participantName: string;
+  participantEmail?: string | null;
+  participantGithubUsername?: string | null;
   onClose: () => void;
 }
 
-export function ProblemSubmissionsViewer({
-  problemId,
-  problemTitle,
+export function ParticipantSubmissionsViewer({
+  participantId,
+  participantName,
+  participantEmail,
+  participantGithubUsername,
   onClose,
-}: ProblemSubmissionsViewerProps) {
+}: ParticipantSubmissionsViewerProps) {
   const { data: session } = useSession();
   const router = useRouter();
   const [submissions, setSubmissions] = useState<Submission[]>([]);
@@ -65,11 +72,15 @@ export function ProblemSubmissionsViewer({
   const currentUserEmail = session?.user?.email?.toLowerCase();
   const currentUserGithub = session?.user?.githubUsername?.toLowerCase();
 
+  const isMyProfile =
+    (currentUserEmail && participantEmail?.toLowerCase() === currentUserEmail) ||
+    (currentUserGithub && participantGithubUsername?.toLowerCase() === currentUserGithub);
+
   useEffect(() => {
     const fetchSubmissions = async () => {
       try {
         setLoading(true);
-        const res = await fetch(`/api/problems/${problemId}/submissions`);
+        const res = await fetch(`/api/participants/${participantId}/submissions`);
         if (!res.ok) throw new Error("Failed to fetch");
         const data = await res.json();
         setSubmissions(data.submissions);
@@ -84,20 +95,24 @@ export function ProblemSubmissionsViewer({
     };
 
     fetchSubmissions();
-  }, [problemId]);
+  }, [participantId]);
 
   const selectedSubmission = submissions.find(
     (s) => s.id === selectedSubmissionId
   );
 
-  const isMySubmission = selectedSubmission && (
-    (currentUserEmail && selectedSubmission.participant.email?.toLowerCase() === currentUserEmail) ||
-    (currentUserGithub && selectedSubmission.participant.githubUsername?.toLowerCase() === currentUserGithub)
-  );
-
   const handleEdit = () => {
-    router.push(`/submit?problemId=${problemId}`);
+    if (!selectedSubmission) return;
+    router.push(`/submit?problemId=${selectedSubmission.problem.id}`);
     onClose();
+  };
+
+  const formatDate = (dateInput: string) => {
+    const date = new Date(dateInput);
+    const month = date.getMonth() + 1;
+    const day = date.getDate();
+    const dayOfWeek = ['일', '월', '화', '수', '목', '금', '토'][date.getDay()];
+    return `${month}.${day} (${dayOfWeek})`;
   };
 
   const editorExtensions = useMemo(
@@ -124,7 +139,6 @@ export function ProblemSubmissionsViewer({
     [selectedSubmissionId]
   );
 
-  // Update editor content when selection changes
   useEffect(() => {
     if (editor && selectedSubmission) {
       editor.commands.setContent(selectedSubmission.code, {
@@ -139,7 +153,7 @@ export function ProblemSubmissionsViewer({
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b bg-gray-50">
           <h2 className="text-lg font-bold text-gray-900">
-            {problemTitle} <span className="text-gray-500 font-normal text-sm ml-2">제출 내역</span>
+            {participantName} <span className="text-gray-500 font-normal text-sm ml-2">제출 내역</span>
           </h2>
           <button
             onClick={onClose}
@@ -183,20 +197,10 @@ export function ProblemSubmissionsViewer({
                       }`}
                     >
                       <span className="font-medium text-sm text-gray-900">
-                        {submission.participant.githubUsername ||
-                          submission.participant.email ||
-                          "알 수 없음"}
+                        Day {submission.problem.dayNumber}: {submission.problem.title}
                       </span>
                       <span className="text-xs text-gray-400 mt-1">
-                        {new Date(submission.submittedAt).toLocaleString(
-                          "ko-KR",
-                          {
-                            month: "numeric",
-                            day: "numeric",
-                            hour: "2-digit",
-                            minute: "2-digit",
-                          }
-                        )}
+                        {formatDate(submission.problem.assignedDate)}
                       </span>
                       <span className="text-xs text-blue-500 mt-0.5 uppercase">
                         {submission.language}
@@ -212,7 +216,7 @@ export function ProblemSubmissionsViewer({
           <div className="flex-1 bg-white overflow-y-auto p-6 flex flex-col">
             {selectedSubmission ? (
               <>
-                {isMySubmission && (
+                {isMyProfile && (
                   <div className="mb-4 flex justify-end">
                     <button
                       onClick={handleEdit}
@@ -247,7 +251,7 @@ export function ProblemSubmissionsViewer({
               </>
             ) : (
               <div className="flex h-full items-center justify-center text-gray-400">
-                {!loading && "참여자를 선택하여 코드를 확인하세요."}
+                {!loading && "문제를 선택하여 코드를 확인하세요."}
               </div>
             )}
           </div>

@@ -87,6 +87,7 @@ body {
 }
 
 .tiptap-editor .ProseMirror pre {
+  background: #1e1e1e;
   border-radius: 0.5rem;
   padding: 1rem;
   overflow-x: auto;
@@ -107,4 +108,50 @@ body {
   background: transparent;
   padding: 0;
   font-size: 0.75rem;
+  color: #d4d4d4;
+}
+
+/* Code block syntax highlighting (dark theme) */
+.tiptap-editor .ProseMirror pre .hljs-comment,
+.tiptap-editor .ProseMirror pre .hljs-quote {
+  color: #6a9955;
+}
+
+.tiptap-editor .ProseMirror pre .hljs-keyword,
+.tiptap-editor .ProseMirror pre .hljs-selector-tag,
+.tiptap-editor .ProseMirror pre .hljs-built_in {
+  color: #569cd6;
+}
+
+.tiptap-editor .ProseMirror pre .hljs-string,
+.tiptap-editor .ProseMirror pre .hljs-attr {
+  color: #ce9178;
+}
+
+.tiptap-editor .ProseMirror pre .hljs-number,
+.tiptap-editor .ProseMirror pre .hljs-literal {
+  color: #b5cea8;
+}
+
+.tiptap-editor .ProseMirror pre .hljs-function,
+.tiptap-editor .ProseMirror pre .hljs-title {
+  color: #dcdcaa;
+}
+
+.tiptap-editor .ProseMirror pre .hljs-type,
+.tiptap-editor .ProseMirror pre .hljs-class {
+  color: #4ec9b0;
+}
+
+.tiptap-editor .ProseMirror pre .hljs-variable,
+.tiptap-editor .ProseMirror pre .hljs-params {
+  color: #9cdcfe;
+}
+
+.tiptap-editor .ProseMirror pre .hljs-operator {
+  color: #d4d4d4;
+}
+
+.tiptap-editor .ProseMirror pre .hljs-punctuation {
+  color: #d4d4d4;
 }

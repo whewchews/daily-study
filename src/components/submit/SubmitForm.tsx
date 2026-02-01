@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useSession } from "next-auth/react";
+import { useRouter } from "next/navigation";
 import { EditorContent, useEditor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import { CodeBlockLowlight } from "@tiptap/extension-code-block-lowlight";
@@ -50,6 +51,7 @@ interface SeasonSummary {
 interface SubmitFormProps {
   seasons: SeasonSummary[];
   defaultSeasonId?: string;
+  defaultProblemId?: string;
   initialGithubUsername: string;
   initialEmail: string;
 }
@@ -70,7 +72,15 @@ const COMMENT_PREFIX_BY_LANGUAGE: Record<string, string> = {
 const buildDefaultMarkdown = (language: CodeBlockLanguageWithAuto) => {
   const normalized = (language || DEFAULT_CODE_BLOCK_LANGUAGE).toLowerCase();
   const commentPrefix = COMMENT_PREFIX_BY_LANGUAGE[normalized] || "//";
-  return `\`\`\`${normalized}\n${commentPrefix} 여기에 코드를 작성하세요\n\`\`\``;
+  return `## 문제 풀이
+
+\`\`\`${normalized}
+${commentPrefix} 여기에 코드를 작성하세요
+\`\`\`
+
+## 문법 정리
+
+`;
 };
 
 const normalizeMarkdown = (value: string) => value.trim();
@@ -92,11 +102,12 @@ lowlight.register({
 export function SubmitForm({
   seasons,
   defaultSeasonId,
+  defaultProblemId,
   initialGithubUsername,
   initialEmail,
 }: SubmitFormProps) {
   const [githubUsername, setGithubUsername] = useState(initialGithubUsername);
-  const [problemId, setProblemId] = useState("");
+  const [problemId, setProblemId] = useState(defaultProblemId || "");
   const [customTitle, setCustomTitle] = useState("");
   const [customUrl, setCustomUrl] = useState("");
   const [codeBlockLanguage, setCodeBlockLanguage] = useState<CodeBlockLanguageWithAuto>(
@@ -112,7 +123,12 @@ export function SubmitForm({
     message: string;
     commitUrl?: string;
   } | null>(null);
+  const [lastSubmissionContext, setLastSubmissionContext] = useState<{
+    seasonId: string;
+    problemId: string;
+  } | null>(null);
   const previousCodeBlockLanguageRef = useRef(codeBlockLanguage);
+  const router = useRouter();
   const editorExtensions = useMemo(
     () => [
       StarterKit.configure({
@@ -146,11 +162,20 @@ export function SubmitForm({
     [editorExtensions]
   );
 
+  // defaultProblemId가 있으면 해당 문제가 속한 시즌을 찾음
+  const seasonForDefaultProblem = defaultProblemId
+    ? seasons.find((season) =>
+        season.problems.some((p) => p.id === defaultProblemId)
+      )
+    : null;
+
   const initialSeasonId =
+    seasonForDefaultProblem?.id ||
     seasons.find((season) => season.id === defaultSeasonId)?.id ||
     seasons[0]?.id ||
     "";
   const [selectedSeasonId, setSelectedSeasonId] = useState(initialSeasonId);
+  const [isInitialLoad, setIsInitialLoad] = useState(true);
 
   useEffect(() => {
     if (!defaultSeasonId) {
@@ -163,6 +188,11 @@ export function SubmitForm({
   }, [defaultSeasonId, seasons]);
 
   useEffect(() => {
+    // 초기 로드 시에는 problemId를 초기화하지 않음 (defaultProblemId 유지)
+    if (isInitialLoad) {
+      setIsInitialLoad(false);
+      return;
+    }
     setProblemId("");
     setCustomTitle("");
     setCustomUrl("");
@@ -224,13 +254,17 @@ export function SubmitForm({
 
         if (data.submission) {
           setCode(data.submission.code);
-          editor?.commands.setContent(data.submission.code);
+          editor?.commands.setContent(data.submission.code, {
+            contentType: "markdown",
+          });
           setIsEditMode(true);
         } else {
           setIsEditMode(false);
           const nextContent = buildDefaultMarkdown(codeBlockLanguage);
           setCode(nextContent);
-          editor?.commands.setContent(nextContent);
+          editor?.commands.setContent(nextContent, {
+            contentType: "markdown",
+          });
         }
       } catch (error) {
         console.error("Failed to fetch submission:", error);
@@ -306,6 +340,10 @@ export function SubmitForm({
           message: data.message,
           commitUrl: data.commit?.url,
         });
+        setLastSubmissionContext({
+          seasonId: selectedSeasonId,
+          problemId,
+        });
         const nextContent = buildDefaultMarkdown(codeBlockLanguage);
         editor?.commands.setContent(nextContent, {
           contentType: "markdown",
@@ -321,6 +359,21 @@ export function SubmitForm({
       setLoading(false);
     }
   }
+
+  const handleViewSubmissions = () => {
+    if (!lastSubmissionContext) return;
+    const { seasonId, problemId: submittedProblemId } = lastSubmissionContext;
+    router.push(
+      `/seasons/${seasonId}?problemId=${encodeURIComponent(
+        submittedProblemId
+      )}`
+    );
+  };
+
+  const handleStartNewSubmission = () => {
+    setLastSubmissionContext(null);
+    setResult(null);
+  };
 
   const formatProblemDate = (dateInput: string | Date) => {
     const date = new Date(dateInput);
@@ -387,8 +440,35 @@ export function SubmitForm({
         </div>
       )}
 
-      <div className="bg-white rounded-lg shadow p-6 space-y-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      {lastSubmissionContext ? (
+        <div className="bg-white rounded-lg shadow p-6 space-y-4 text-center">
+          <h2 className="text-lg font-semibold text-gray-900">
+            제출이 완료되었습니다.
+          </h2>
+          <p className="text-sm text-gray-600">
+            제출현황 페이지로 이동하면 방금 제출한 기수의 해당 날짜 제출 내역이 바로 열립니다.
+          </p>
+          <div className="flex flex-col gap-3 sm:flex-row sm:justify-center">
+            <button
+              type="button"
+              onClick={handleViewSubmissions}
+              className="w-full sm:w-auto px-4 py-3 bg-blue-600 text-white rounded-md font-medium hover:bg-blue-700 transition"
+            >
+              제출현황 보기
+            </button>
+            <button
+              type="button"
+              onClick={handleStartNewSubmission}
+              className="w-full sm:w-auto px-4 py-3 border border-gray-300 rounded-md text-gray-700 font-medium hover:bg-gray-50 transition"
+            >
+              다른 문제 제출하기
+            </button>
+          </div>
+        </div>
+      ) : (
+        <>
+          <div className="bg-white rounded-lg shadow p-6 space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div>
             <label
               htmlFor="githubUsername"
@@ -724,16 +804,18 @@ export function SubmitForm({
             triggerClassName="w-full px-4 py-3 bg-blue-600 text-white rounded-md hover:bg-blue-700 font-medium"
           />
         )}
-      </div>
+          </div>
 
-      <div className="text-center text-sm text-gray-500">
-        <p>
-          {seasonNumber
-            ? `${seasonNumber}기 스터디에 제출됩니다.`
-            : "선택한 기수에 제출됩니다."}{" "}
-          제출된 코드는 GitHub 공용 레포지토리에 자동으로 커밋됩니다.
-        </p>
-      </div>
+          <div className="text-center text-sm text-gray-500">
+            <p>
+              {seasonNumber
+                ? `${seasonNumber}기 스터디에 제출됩니다.`
+                : "선택한 기수에 제출됩니다."}{" "}
+              제출된 코드는 GitHub 공용 레포지토리에 자동으로 커밋됩니다.
+            </p>
+          </div>
+        </>
+      )}
     </form>
   );
 }

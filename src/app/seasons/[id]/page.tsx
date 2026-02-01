@@ -8,10 +8,16 @@ export const dynamic = 'force-dynamic'
 
 export default async function SeasonDashboardPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>
+  searchParams?: { problemId?: string | string[] }
 }) {
   const { id } = await params
+  const initialProblemId =
+    typeof searchParams?.problemId === "string"
+      ? searchParams.problemId
+      : undefined
 
   const season = await prisma.season.findUnique({
     where: { id },
@@ -90,6 +96,7 @@ export default async function SeasonDashboardPage({
         <SubmissionGrid
           problems={dashboardData.problems}
           participants={dashboardData.participants}
+          initialProblemId={initialProblemId}
         />
       </main>
     </div>
