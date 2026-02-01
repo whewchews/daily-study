@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { EditorContent, useEditor } from "@tiptap/react";
@@ -18,6 +18,7 @@ import go from "highlight.js/lib/languages/go";
 import rust from "highlight.js/lib/languages/rust";
 import kotlin from "highlight.js/lib/languages/kotlin";
 import swift from "highlight.js/lib/languages/swift";
+import { useProblemSubmissions } from "@/hooks/useProblemSubmissions";
 
 const lowlight = createLowlight(common);
 
@@ -34,17 +35,6 @@ lowlight.register({
   swift,
 });
 
-interface Submission {
-  id: string;
-  code: string;
-  language: string;
-  submittedAt: string;
-  participant: {
-    githubUsername?: string | null;
-    email?: string | null;
-  };
-}
-
 interface ProblemSubmissionsViewerProps {
   problemId: string;
   problemTitle: string;
@@ -58,36 +48,18 @@ export function ProblemSubmissionsViewer({
 }: ProblemSubmissionsViewerProps) {
   const { data: session } = useSession();
   const router = useRouter();
-  const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [selectedSubmissionId, setSelectedSubmissionId] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+
+  const { data, isLoading: loading } = useProblemSubmissions(problemId);
+  const submissions = useMemo(() => data?.submissions ?? [], [data?.submissions]);
 
   const currentUserEmail = session?.user?.email?.toLowerCase();
   const currentUserGithub = session?.user?.githubUsername?.toLowerCase();
 
-  useEffect(() => {
-    const fetchSubmissions = async () => {
-      try {
-        setLoading(true);
-        const res = await fetch(`/api/problems/${problemId}/submissions`);
-        if (!res.ok) throw new Error("Failed to fetch");
-        const data = await res.json();
-        setSubmissions(data.submissions);
-        if (data.submissions.length > 0) {
-          setSelectedSubmissionId(data.submissions[0].id);
-        }
-      } catch (error) {
-        console.error(error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchSubmissions();
-  }, [problemId]);
+  const effectiveSelectedId = selectedSubmissionId ?? submissions[0]?.id ?? null;
 
   const selectedSubmission = submissions.find(
-    (s) => s.id === selectedSubmissionId
+    (s) => s.id === effectiveSelectedId
   );
 
   const isMySubmission = selectedSubmission && (
@@ -121,10 +93,9 @@ export function ProblemSubmissionsViewer({
       editable: false,
       immediatelyRender: false,
     },
-    [selectedSubmissionId]
+    [effectiveSelectedId]
   );
 
-  // Update editor content when selection changes
   useEffect(() => {
     if (editor && selectedSubmission) {
       editor.commands.setContent(selectedSubmission.code, {
@@ -163,7 +134,7 @@ export function ProblemSubmissionsViewer({
 
         <div className="flex flex-1 overflow-hidden">
           {/* Sidebar (Tabs) */}
-          <div className="w-64 border-r bg-gray-50 overflow-y-auto flex-shrink-0">
+          <div className="w-64 border-r bg-gray-50 overflow-y-auto shrink-0">
             {loading ? (
               <div className="p-4 text-center text-gray-500">Loading...</div>
             ) : submissions.length === 0 ? (
@@ -177,7 +148,7 @@ export function ProblemSubmissionsViewer({
                     <button
                       onClick={() => setSelectedSubmissionId(submission.id)}
                       className={`w-full text-left px-4 py-3 hover:bg-white transition flex flex-col ${
-                        selectedSubmissionId === submission.id
+                        effectiveSelectedId === submission.id
                           ? "bg-white border-l-4 border-blue-600 shadow-sm"
                           : "border-l-4 border-transparent text-gray-600"
                       }`}

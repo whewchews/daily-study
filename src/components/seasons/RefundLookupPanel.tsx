@@ -3,52 +3,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useSession } from "next-auth/react";
 import { LoginModal } from "@/components/auth/LoginModal";
+import { useRefundQuery, RefundApiResponse } from "@/hooks/useRefundQuery";
 
 type RefundStatus = "NOT_REGISTERED" | "UNPAID" | "ACTIVE" | "DROPPED";
-
-interface RefundRankSummary {
-  rank: number;
-  count: number;
-  totalPercentage: number;
-  totalBonus: number;
-  totalRefund: number;
-}
-
-interface RefundSummary {
-  paidCount: number;
-  activeCount: number;
-  droppedCount: number;
-  rankCounts: {
-    first: number;
-    second: number;
-    third: number;
-    other: number;
-  };
-  rankSummaries: RefundRankSummary[];
-  activeRefundTotal: number;
-  bonusTotal: number;
-  bonusRemainder: number;
-}
-
-interface RefundApiResponse {
-  season: {
-    id: string;
-    seasonNumber: number;
-    name: string;
-    entryFee: number;
-  };
-  totalProblems: number;
-  totalPool: number;
-  droppedPool: number;
-  summary: RefundSummary;
-  my: {
-    status: RefundStatus;
-    refundAmount: number;
-    missedCount: number;
-    submittedCount: number;
-    totalProblems: number;
-  };
-}
 
 const formatCurrency = (value: number) => `${value.toLocaleString()}원`;
 
@@ -68,19 +25,25 @@ const statusToneMap: Record<RefundStatus, string> = {
 
 export function RefundLookupPanel({ seasonId }: { seasonId: string }) {
   const { status } = useSession();
-  const [refundLoading, setRefundLoading] = useState(false);
-  const [refundError, setRefundError] = useState("");
-  const [refundData, setRefundData] = useState<RefundApiResponse | null>(null);
+  const [hasQueried, setHasQueried] = useState(false);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const dialogRef = useRef<HTMLDivElement | null>(null);
   const detailFirstRef = useRef<HTMLButtonElement | null>(null);
 
   const isAuthenticated = status === "authenticated";
 
+  const {
+    data: refundData,
+    error,
+    isFetching,
+    refetch,
+  } = useRefundQuery(seasonId, hasQueried && isAuthenticated);
+
+  const refundError = error?.message || "";
+
   useEffect(() => {
     if (!isAuthenticated) {
-      setRefundData(null);
-      setRefundError("");
+      setHasQueried(false);
       return;
     }
   }, [isAuthenticated]);
@@ -138,36 +101,15 @@ export function RefundLookupPanel({ seasonId }: { seasonId: string }) {
     }
   };
 
-  const handleQuery = async () => {
-    setRefundError("");
-
+  const handleQuery = () => {
     if (!isAuthenticated) {
-      setRefundError("로그인 후 조회할 수 있습니다.");
       return;
     }
 
-    setRefundLoading(true);
-    try {
-      const refundRes = await fetch(`/api/refund/${seasonId}/me`);
-
-      if (refundRes.status === 401) {
-        setRefundError("로그인이 필요합니다.");
-        return;
-      }
-
-      if (!refundRes.ok) {
-        const data = await refundRes.json().catch(() => null);
-        throw new Error(data?.error || "환급액을 조회하지 못했습니다.");
-      }
-
-      const data = await refundRes.json();
-      setRefundData(data);
-    } catch (error) {
-      setRefundError(
-        error instanceof Error ? error.message : "환급액을 조회하지 못했습니다."
-      );
-    } finally {
-      setRefundLoading(false);
+    if (hasQueried) {
+      refetch();
+    } else {
+      setHasQueried(true);
     }
   };
 
@@ -207,10 +149,10 @@ export function RefundLookupPanel({ seasonId }: { seasonId: string }) {
         <button
           type="button"
           onClick={handleQuery}
-          disabled={!isAuthenticated || refundLoading}
+          disabled={!isAuthenticated || isFetching}
           className="px-4 py-2 text-sm text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50"
         >
-          {refundLoading ? "조회 중..." : "환급액 조회"}
+          {isFetching ? "조회 중..." : "환급액 조회"}
         </button>
       </div>
 

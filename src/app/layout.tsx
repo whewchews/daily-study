@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import { Geist, Geist_Mono } from 'next/font/google'
 import { SessionProvider } from '@/components/providers/SessionProvider'
+import { QueryClientProvider } from '@/components/providers/QueryClientProvider'
 import './globals.css'
 import 'highlight.js/styles/github-dark.css'
 
@@ -27,7 +28,9 @@ export default function RootLayout({
   return (
     <html lang="ko">
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
-        <SessionProvider>{children}</SessionProvider>
+        <QueryClientProvider>
+          <SessionProvider>{children}</SessionProvider>
+        </QueryClientProvider>
       </body>
     </html>
   )
