@@ -57,7 +57,7 @@ cp .env.example .env
 - `GITHUB_TOKEN`: GitHub Personal Access Token (코드 커밋용)
 - `GITHUB_REPO_OWNER`: GitHub 레포 소유자
 - `GITHUB_REPO_NAME`: GitHub 레포 이름
-- `ADMIN_GITHUB_USERNAMES`: 관리자 GitHub 아이디 (쉼표로 구분)
+- `ADMIN_EMAILS`: 관리자 이메일 주소 (쉼표로 구분)
 
 ### 3. 데이터베이스 마이그레이션
 

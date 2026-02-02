@@ -23,14 +23,36 @@ const statusToneMap: Record<RefundStatus, string> = {
   NOT_REGISTERED: "bg-gray-100 text-gray-600",
 };
 
-export function RefundLookupPanel({ seasonId }: { seasonId: string }) {
+interface RefundLookupPanelProps {
+  seasonId: string;
+  endDate: string;
+  isParticipant: boolean;
+}
+
+export function RefundLookupPanel({ seasonId, endDate, isParticipant }: RefundLookupPanelProps) {
   const { status } = useSession();
   const [hasQueried, setHasQueried] = useState(false);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
+  const [isRulesOpen, setIsRulesOpen] = useState(false);
   const dialogRef = useRef<HTMLDivElement | null>(null);
+  const rulesDialogRef = useRef<HTMLDivElement | null>(null);
   const detailFirstRef = useRef<HTMLButtonElement | null>(null);
+  const rulesFirstRef = useRef<HTMLButtonElement | null>(null);
 
   const isAuthenticated = status === "authenticated";
+
+  // 마지막날 2일 전부터 환급액 조회 버튼 표시
+  const canShowRefundQuery = useMemo(() => {
+    const end = new Date(endDate);
+    const twoDaysBefore = new Date(end);
+    twoDaysBefore.setDate(twoDaysBefore.getDate() - 2);
+    twoDaysBefore.setHours(0, 0, 0, 0);
+    const now = new Date();
+    return now >= twoDaysBefore;
+  }, [endDate]);
+
+  // 환급액 조회 버튼 표시 조건: 참여자이고 마지막날 2일 전 이후
+  const showRefundQueryButton = isParticipant && canShowRefundQuery;
 
   const {
     data: refundData,
@@ -66,12 +88,65 @@ export function RefundLookupPanel({ seasonId }: { seasonId: string }) {
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, [isDetailOpen]);
 
+  useEffect(() => {
+    if (!isRulesOpen) {
+      return;
+    }
+
+    rulesFirstRef.current?.focus();
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        setIsRulesOpen(false);
+      }
+    };
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [isRulesOpen]);
+
   const handleDialogKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
     if (event.key !== "Tab") {
       return;
     }
 
     const dialog = dialogRef.current;
+    if (!dialog) {
+      return;
+    }
+
+    const focusable = Array.from(
+      dialog.querySelectorAll<HTMLElement>(
+        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+      )
+    ).filter((element) => !element.hasAttribute("disabled"));
+
+    if (focusable.length === 0) {
+      return;
+    }
+
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    const active = document.activeElement as HTMLElement | null;
+
+    if (event.shiftKey) {
+      if (active === first || active === dialog) {
+        event.preventDefault();
+        last.focus();
+      }
+    } else if (active === last) {
+      event.preventDefault();
+      first.focus();
+    }
+  };
+
+  const handleRulesKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (event.key !== "Tab") {
+      return;
+    }
+
+    const dialog = rulesDialogRef.current;
     if (!dialog) {
       return;
     }
@@ -141,26 +216,39 @@ export function RefundLookupPanel({ seasonId }: { seasonId: string }) {
     <div className="bg-white rounded-lg shadow p-6 mb-8">
       <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <div>
-          <h2 className="text-lg font-semibold text-gray-900">환급액 조회</h2>
+          <h2 className="text-lg font-semibold text-gray-900">환급 정보</h2>
           <p className="text-sm text-gray-500">
-            조회 버튼을 누르면 예상 환급액을 확인할 수 있어요.
+            {showRefundQueryButton
+              ? "조회 버튼을 누르면 예상 환급액을 확인할 수 있어요."
+              : "환급 규칙을 확인할 수 있어요."}
           </p>
         </div>
-        <button
-          type="button"
-          onClick={handleQuery}
-          disabled={!isAuthenticated || isFetching}
-          className="px-4 py-2 text-sm text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50"
-        >
-          {isFetching ? "조회 중..." : "환급액 조회"}
-        </button>
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={() => setIsRulesOpen(true)}
+            className="px-4 py-2 text-sm text-gray-700 border border-gray-300 rounded-md hover:bg-gray-50"
+          >
+            환급 규칙
+          </button>
+          {showRefundQueryButton && (
+            <button
+              type="button"
+              onClick={handleQuery}
+              disabled={!isAuthenticated || isFetching}
+              className="px-4 py-2 text-sm text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50"
+            >
+              {isFetching ? "조회 중..." : "환급액 조회"}
+            </button>
+          )}
+        </div>
       </div>
 
-      {status === "loading" && (
+      {showRefundQueryButton && status === "loading" && (
         <p className="mt-4 text-sm text-gray-500">로그인 상태 확인 중...</p>
       )}
 
-      {!isAuthenticated && status !== "loading" && (
+      {showRefundQueryButton && !isAuthenticated && status !== "loading" && (
         <div className="mt-4 p-4 rounded-md bg-gray-50 text-sm text-gray-600 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <span>로그인 후 환급액을 조회할 수 있어요.</span>
           <LoginModal
@@ -368,6 +456,72 @@ export function RefundLookupPanel({ seasonId }: { seasonId: string }) {
                 원단위 절삭으로{" "}
                 {formatCurrency(detailSummary.bonusRemainder)}가 남을 수
                 있습니다.
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isRulesOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <button
+            type="button"
+            aria-label="닫기"
+            onClick={() => setIsRulesOpen(false)}
+            className="absolute inset-0 bg-black/40"
+          />
+          <div
+            role="dialog"
+            aria-modal="true"
+            ref={rulesDialogRef}
+            onKeyDown={handleRulesKeyDown}
+            className="relative z-10 w-full max-w-lg mx-4 bg-white rounded-lg shadow-lg p-6"
+          >
+            <div className="flex items-start justify-between gap-3">
+              <h2 className="text-lg font-semibold text-gray-900">
+                환급 규칙
+              </h2>
+              <button
+                ref={rulesFirstRef}
+                onClick={() => setIsRulesOpen(false)}
+                className="text-gray-500 hover:text-gray-700"
+              >
+                닫기
+              </button>
+            </div>
+
+            <div className="mt-4 space-y-4 text-sm text-gray-700">
+              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                <h3 className="font-semibold text-yellow-800 mb-2">
+                  기본 규칙
+                </h3>
+                <ul className="space-y-1 text-yellow-700">
+                  <li>- 1등 (0회 미인증): 중도포기 풀의 70%</li>
+                  <li>- 2등 (1회 미인증): 중도포기 풀의 20%</li>
+                  <li>- 3등 (2회 미인증): 중도포기 풀의 10%</li>
+                  <li>- 중도포기 (3회 이상 미인증): 환급 없음</li>
+                  <li>- 완주자는 참가비를 전액 환급받습니다.</li>
+                </ul>
+              </div>
+
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <h3 className="font-semibold text-blue-800 mb-2">
+                  미인증이란?
+                </h3>
+                <p className="text-blue-700">
+                  해당 날짜에 문제를 제출하지 않은 경우 미인증으로 처리됩니다.
+                  3회 이상 미인증 시 중도포기로 전환되어 환급을 받을 수 없습니다.
+                </p>
+              </div>
+
+              <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                <h3 className="font-semibold text-gray-800 mb-2">
+                  환급 시기
+                </h3>
+                <p className="text-gray-600">
+                  환급액은 기수 종료 후 정산되며, 환급액 조회는 기수 종료 2일
+                  전부터 가능합니다.
+                </p>
               </div>
             </div>
           </div>

@@ -1,5 +1,7 @@
 import { prisma } from '@/lib/db/prisma'
 import { notFound } from 'next/navigation'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth/options'
 import { Header } from '@/components/layout/Header'
 import { SubmissionGrid } from '@/components/dashboard/SubmissionGrid'
 import { RefundLookupPanel } from '@/components/seasons/RefundLookupPanel'
@@ -18,6 +20,9 @@ export default async function SeasonDashboardPage({
     typeof searchParams?.problemId === "string"
       ? searchParams.problemId
       : undefined
+
+  const session = await getServerSession(authOptions)
+  const currentUsername = session?.user?.githubUsername
 
   const season = await prisma.season.findUnique({
     where: { id },
@@ -40,6 +45,19 @@ export default async function SeasonDashboardPage({
 
   if (!season) {
     notFound()
+  }
+
+  // 현재 사용자가 해당 시즌의 참여자인지 확인 (DROPPED 포함)
+  let isParticipant = false
+  if (currentUsername) {
+    const participant = await prisma.participant.findFirst({
+      where: {
+        seasonId: id,
+        githubUsername: currentUsername,
+      },
+      select: { id: true },
+    })
+    isParticipant = !!participant
   }
 
   const dashboardData = {
@@ -91,7 +109,11 @@ export default async function SeasonDashboardPage({
           </div>
         </div>
 
-        <RefundLookupPanel seasonId={season.id} />
+        <RefundLookupPanel
+          seasonId={season.id}
+          endDate={season.endDate.toISOString()}
+          isParticipant={isParticipant}
+        />
 
         <SubmissionGrid
           problems={dashboardData.problems}

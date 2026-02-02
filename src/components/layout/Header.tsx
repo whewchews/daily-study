@@ -3,9 +3,13 @@
 import Link from 'next/link'
 import { useSession, signOut } from 'next-auth/react'
 import { LoginModal } from '@/components/auth/LoginModal'
+import { isAdminUser } from '@/lib/auth/admin'
 
 export function Header() {
   const { data: session } = useSession()
+  const showAdminLink = isAdminUser({
+    email: session?.user?.email,
+  })
 
   return (
     <header className="bg-white border-b border-gray-200">
@@ -42,12 +46,14 @@ export function Header() {
           <div className="flex items-center space-x-4">
             {session ? (
               <>
-                <Link
-                  href="/admin"
-                  className="text-gray-600 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium"
-                >
-                  관리자
-                </Link>
+                {showAdminLink && (
+                  <Link
+                    href="/admin"
+                    className="text-gray-600 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium"
+                  >
+                    관리자
+                  </Link>
+                )}
                 <button
                   onClick={() => signOut()}
                   className="text-gray-600 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium"

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { EditorContent, useEditor } from "@tiptap/react";
@@ -162,6 +162,37 @@ export function SubmitForm({
     [editorExtensions]
   );
 
+  const normalizedEmail = initialEmail?.trim().toLowerCase() || "";
+  const normalizedGithubUsername = githubUsername?.trim().toLowerCase() || "";
+
+  const matchesCurrentUser = useCallback(
+    (participant: SeasonSummary["participants"][number]) => {
+      if (normalizedEmail && participant.email) {
+        if (participant.email.toLowerCase() === normalizedEmail) {
+          return true;
+        }
+      }
+      if (normalizedGithubUsername && participant.githubUsername) {
+        if (
+          participant.githubUsername.toLowerCase() === normalizedGithubUsername
+        ) {
+          return true;
+        }
+      }
+      return false;
+    },
+    [normalizedEmail, normalizedGithubUsername]
+  );
+
+  const registeredSeasons = useMemo(() => {
+    if (!normalizedEmail && !normalizedGithubUsername) {
+      return [];
+    }
+    return seasons.filter((season) =>
+      season.participants.some(matchesCurrentUser)
+    );
+  }, [seasons, matchesCurrentUser]);
+
   // defaultProblemId가 있으면 해당 문제가 속한 시즌을 찾음
   const seasonForDefaultProblem = defaultProblemId
     ? seasons.find((season) =>
@@ -169,23 +200,56 @@ export function SubmitForm({
       )
     : null;
 
-  const initialSeasonId =
-    seasonForDefaultProblem?.id ||
-    seasons.find((season) => season.id === defaultSeasonId)?.id ||
-    seasons[0]?.id ||
-    "";
-  const [selectedSeasonId, setSelectedSeasonId] = useState(initialSeasonId);
+  const getPreferredSeasonId = () => {
+    if (!registeredSeasons.length) {
+      return "";
+    }
+    if (
+      seasonForDefaultProblem &&
+      registeredSeasons.some((season) => season.id === seasonForDefaultProblem.id)
+    ) {
+      return seasonForDefaultProblem.id;
+    }
+    if (
+      defaultSeasonId &&
+      registeredSeasons.some((season) => season.id === defaultSeasonId)
+    ) {
+      return defaultSeasonId;
+    }
+    return registeredSeasons[0].id;
+  };
+
+  const [selectedSeasonId, setSelectedSeasonId] = useState(getPreferredSeasonId);
   const [isInitialLoad, setIsInitialLoad] = useState(true);
 
   useEffect(() => {
     if (!defaultSeasonId) {
       return;
     }
-    const exists = seasons.some((season) => season.id === defaultSeasonId);
-    if (exists) {
+    if (registeredSeasons.some((season) => season.id === defaultSeasonId)) {
       setSelectedSeasonId(defaultSeasonId);
     }
-  }, [defaultSeasonId, seasons]);
+  }, [defaultSeasonId, registeredSeasons]);
+
+  useEffect(() => {
+    if (!registeredSeasons.length) {
+      setSelectedSeasonId("");
+      return;
+    }
+    if (
+      registeredSeasons.some((season) => season.id === selectedSeasonId)
+    ) {
+      return;
+    }
+    const fallbackSeasonId =
+      seasonForDefaultProblem &&
+      registeredSeasons.some(
+        (season) => season.id === seasonForDefaultProblem.id
+      )
+        ? seasonForDefaultProblem.id
+        : registeredSeasons[0].id;
+    setSelectedSeasonId(fallbackSeasonId);
+  }, [registeredSeasons, seasonForDefaultProblem?.id, selectedSeasonId]);
 
   useEffect(() => {
     // 초기 로드 시에는 problemId를 초기화하지 않음 (defaultProblemId 유지)
@@ -199,21 +263,13 @@ export function SubmitForm({
   }, [selectedSeasonId]);
 
   const selectedSeason =
-    seasons.find((season) => season.id === selectedSeasonId) || seasons[0];
+    registeredSeasons.find((season) => season.id === selectedSeasonId) ??
+    registeredSeasons[0];
   const problems = selectedSeason?.problems ?? [];
   const participants = selectedSeason?.participants ?? [];
   const seasonNumber = selectedSeason?.seasonNumber;
 
-  const normalizedEmail = initialEmail?.trim().toLowerCase() || "";
-  const isRegistered = participants.some((participant) => {
-    if (normalizedEmail && participant.email) {
-      return participant.email.toLowerCase() === normalizedEmail;
-    }
-    if (participant.githubUsername && githubUsername) {
-      return participant.githubUsername.toLowerCase() === githubUsername.toLowerCase();
-    }
-    return false;
-  });
+  const isRegistered = participants.some(matchesCurrentUser);
   const selectedProblem = problems.find((p) => p.id === problemId);
   const isFreeChoice = selectedProblem?.problemType === "FREE";
   const languageOptions = getCodeBlockLanguageOptions();
@@ -248,6 +304,12 @@ export function SubmitForm({
         return;
       }
 
+      // 등록되지 않은 참여자면 API 호출하지 않음
+      if (!isRegistered) {
+        setIsEditMode(false);
+        return;
+      }
+
       try {
         const res = await fetch(`/api/submissions/me?problemId=${problemId}`);
         const data = await res.json();
@@ -272,7 +334,7 @@ export function SubmitForm({
     }
 
     fetchMySubmission();
-  }, [problemId, editor]); // codeBlockLanguage 의존성 제거 (초기화 시 현재 선택된 언어 유지)
+  }, [problemId, editor, isRegistered]); // codeBlockLanguage 의존성 제거 (초기화 시 현재 선택된 언어 유지)
 
   useEffect(() => {
     if (!editor) return;
@@ -517,32 +579,38 @@ export function SubmitForm({
           >
             기수 선택
           </label>
-          {seasons.length > 1 ? (
-            <select
-              id="season"
-              value={selectedSeasonId}
-              onChange={(e) => setSelectedSeasonId(e.target.value)}
-              required
-              className="mt-1 text-gray-700 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm border p-2"
-            >
-              {seasons.map((season) => (
-                <option key={season.id} value={season.id}>
-                  {season.seasonNumber}기 - {season.name}
-                </option>
-              ))}
-            </select>
+          {registeredSeasons.length > 0 ? (
+            registeredSeasons.length > 1 ? (
+              <select
+                id="season"
+                value={selectedSeasonId}
+                onChange={(e) => setSelectedSeasonId(e.target.value)}
+                required
+                className="mt-1 text-gray-700 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm border p-2"
+              >
+                {registeredSeasons.map((season) => (
+                  <option key={season.id} value={season.id}>
+                    {season.seasonNumber}기 - {season.name}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <input
+                id="season"
+                type="text"
+                value={
+                  selectedSeason
+                    ? `${selectedSeason.seasonNumber}기 - ${selectedSeason.name}`
+                    : ""
+                }
+                disabled
+                className="mt-1 block w-full rounded-md border-gray-300 bg-gray-100 text-gray-500 sm:text-sm border p-2"
+              />
+            )
           ) : (
-            <input
-              id="season"
-              type="text"
-              value={
-                selectedSeason
-                  ? `${selectedSeason.seasonNumber}기 - ${selectedSeason.name}`
-                  : ""
-              }
-              disabled
-              className="mt-1 block w-full rounded-md border-gray-300 bg-gray-100 text-gray-500 sm:text-sm border p-2"
-            />
+            <p className="mt-1 text-sm text-red-500">
+              등록된 기수가 없습니다.
+            </p>
           )}
         </div>
 
@@ -558,6 +626,7 @@ export function SubmitForm({
             value={problemId}
             onChange={(e) => setProblemId(e.target.value)}
             required
+            disabled={!registeredSeasons.length}
             className="mt-1 text-gray-700 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm border p-2 "
           >
             <option value="">문제를 선택하세요</option>

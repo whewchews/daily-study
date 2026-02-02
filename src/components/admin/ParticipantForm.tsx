@@ -17,21 +17,26 @@ export function ParticipantForm({ seasonId }: { seasonId: string }) {
     const formData = new FormData(e.currentTarget)
 
     if (bulkMode) {
-      const emails = (formData.get('emails') as string)
+      const entriesValue = (formData.get('entries') as string) || ''
+      const entries = entriesValue
         .split('\n')
-        .map(s => s.trim())
+        .map((s) => s.trim())
         .filter(Boolean)
 
       try {
-        for (const email of emails) {
+        for (const entry of entries) {
+          if (!entry.includes('@')) {
+            console.warn('Skipping invalid entry:', entry)
+            continue
+          }
           const res = await fetch(`/api/seasons/${seasonId}/participants`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email, isPaid: false }),
+            body: JSON.stringify({ email: entry, isPaid: false }),
           })
           if (!res.ok) {
             const result = await res.json()
-            console.warn(`Failed to add ${email}:`, result.error)
+            console.warn(`Failed to add ${entry}:`, result.error)
           }
         }
         router.refresh()
@@ -41,31 +46,32 @@ export function ParticipantForm({ seasonId }: { seasonId: string }) {
       } finally {
         setLoading(false)
       }
-    } else {
-      const data = {
-        email: formData.get('email') as string,
-        isPaid: formData.get('isPaid') === 'on',
+      return
+    }
+
+    const data = {
+      email: formData.get('email') as string,
+      isPaid: formData.get('isPaid') === 'on',
+    }
+
+    try {
+      const res = await fetch(`/api/seasons/${seasonId}/participants`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      })
+
+      if (!res.ok) {
+        const result = await res.json()
+        throw new Error(result.error || 'Failed to add participant')
       }
 
-      try {
-        const res = await fetch(`/api/seasons/${seasonId}/participants`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(data),
-        })
-
-        if (!res.ok) {
-          const result = await res.json()
-          throw new Error(result.error || 'Failed to add participant')
-        }
-
-        router.refresh()
-        ;(e.target as HTMLFormElement).reset()
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'An error occurred')
-      } finally {
-        setLoading(false)
-      }
+      router.refresh()
+      ;(e.target as HTMLFormElement).reset()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An error occurred')
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -89,12 +95,12 @@ export function ParticipantForm({ seasonId }: { seasonId: string }) {
 
         {bulkMode ? (
           <div>
-            <label htmlFor="emails" className="block text-sm font-medium text-gray-700">
+            <label htmlFor="entries" className="block text-sm font-medium text-gray-700">
               이메일 (한 줄에 하나씩)
             </label>
             <textarea
-              id="emails"
-              name="emails"
+              id="entries"
+              name="entries"
               rows={10}
               required
               placeholder={`user1@example.com\nuser2@example.com\nuser3@example.com`}
@@ -104,10 +110,7 @@ export function ParticipantForm({ seasonId }: { seasonId: string }) {
         ) : (
           <>
             <div>
-              <label
-                htmlFor="email"
-                className="block text-sm font-medium text-gray-700"
-              >
+              <label htmlFor="email" className="block text-sm font-medium text-gray-700">
                 이메일
               </label>
               <input
@@ -116,7 +119,7 @@ export function ParticipantForm({ seasonId }: { seasonId: string }) {
                 name="email"
                 required
                 placeholder="예: user@example.com"
-                className="mt-1  text-gray-700 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm border p-2"
+                className="mt-1 text-gray-700 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm border p-2"
               />
             </div>
 

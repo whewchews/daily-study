@@ -2,11 +2,7 @@ import { NextAuthOptions } from 'next-auth'
 import GithubProvider from 'next-auth/providers/github'
 import { PrismaAdapter } from '@auth/prisma-adapter'
 import { prisma } from '@/lib/db/prisma'
-
-const ADMIN_EMAILS = (process.env.ADMIN_EMAILS || '')
-  .split(',')
-  .map(s => s.trim().toLowerCase())
-  .filter(Boolean)
+import { isAdminUser } from '@/lib/auth/admin'
 
 export const authOptions: NextAuthOptions = {
   adapter: PrismaAdapter(prisma) as NextAuthOptions['adapter'],
@@ -53,6 +49,5 @@ export const authOptions: NextAuthOptions = {
 }
 
 export function isAdmin(email: string | undefined | null): boolean {
-  if (!email) return false
-  return ADMIN_EMAILS.includes(email.toLowerCase())
+  return isAdminUser({ email })
 }

@@ -39,7 +39,10 @@ export async function POST(
     const body = await request.json()
     const rawEmail = typeof body?.email === 'string' ? body.email : ''
     const email = rawEmail.trim().toLowerCase()
-    const { isPaid, status, githubUsername } = body
+    const rawGithubUsername =
+      typeof body?.githubUsername === 'string' ? body.githubUsername : ''
+    const githubUsername = rawGithubUsername.trim() || undefined
+    const { isPaid, status } = body
 
     if (!email) {
       return NextResponse.json({ error: '이메일이 필요합니다.' }, { status: 400 })
