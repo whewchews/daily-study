@@ -70,14 +70,17 @@ export function ProblemTableEditor({
       (_, i) => {
         const dayNumber = i + 1;
         const existing = existingMap.get(dayNumber);
-        const assignedDate = addDays(new Date(startDate), dayNumber - 1);
+        const assignedDate = format(
+          addDays(new Date(startDate), dayNumber - 1),
+          "yyyy-MM-dd",
+        );
 
         if (existing) {
           return {
             dayNumber,
             title: existing.title,
             url: existing.url || "",
-            assignedDate: format(new Date(existing.assignedDate), "yyyy-MM-dd"),
+            assignedDate,
             problemType: existing.problemType,
             isPractice: existing.isPractice,
           };
@@ -87,7 +90,7 @@ export function ProblemTableEditor({
           dayNumber,
           title: getDefaultTitle(dayNumber),
           url: "",
-          assignedDate: format(assignedDate, "yyyy-MM-dd"),
+          assignedDate,
           problemType: getDefaultProblemType(dayNumber),
           isPractice: dayNumber === 1,
         };

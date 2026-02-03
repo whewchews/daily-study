@@ -81,6 +81,28 @@ export async function PUT(
       },
     })
 
+    // startDate가 변경되면 모든 문제의 assignedDate를 재계산
+    if (startDate) {
+      const problems = await prisma.problem.findMany({
+        where: { seasonId: id },
+        select: { id: true, dayNumber: true },
+      })
+
+      if (problems.length > 0) {
+        const newStartDate = new Date(startDate)
+        await Promise.all(
+          problems.map((problem) => {
+            const assignedDate = new Date(newStartDate)
+            assignedDate.setDate(assignedDate.getDate() + problem.dayNumber - 1)
+            return prisma.problem.update({
+              where: { id: problem.id },
+              data: { assignedDate },
+            })
+          })
+        )
+      }
+    }
+
     return NextResponse.json(season)
   } catch (error) {
     console.error('Error updating season:', error)
