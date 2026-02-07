@@ -15,9 +15,9 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { githubUsername, problemId, code, customTitle, customUrl } = body
+    const { problemId, code, customTitle, customUrl } = body
 
-    if (!githubUsername || !problemId || !code) {
+    if (!problemId || !code) {
       return NextResponse.json({ error: '필수 항목이 누락되었습니다.' }, { status: 400 })
     }
 
@@ -57,13 +57,11 @@ export async function POST(request: NextRequest) {
 
     const normalizedEmail = session.user.email?.toLowerCase() || undefined
 
+    // 세션 이메일로만 참가자를 찾음 (클라이언트 제공 정보 불신)
     const participant = await prisma.participant.findFirst({
       where: {
         seasonId: problem.seasonId,
-        OR: [
-          ...(normalizedEmail ? [{ email: normalizedEmail }] : []),
-          { githubUsername },
-        ],
+        email: normalizedEmail,
       },
     })
 
@@ -81,13 +79,28 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    if (!participant.githubUsername || participant.githubUsername !== githubUsername) {
+    if (participant.status === 'COMPLETED') {
+      return NextResponse.json(
+        { error: '이미 완료된 참여자입니다.' },
+        { status: 400 }
+      )
+    }
+
+    // GitHub username은 세션에서 가져오거나, 참가자 DB 정보 사용
+    const githubUsername = session.user.name || participant.githubUsername
+
+    if (!githubUsername) {
+      return NextResponse.json(
+        { error: 'GitHub 사용자 이름이 필요합니다. 프로필에서 설정해주세요.' },
+        { status: 400 }
+      )
+    }
+
+    // 참가자의 githubUsername이 없으면 업데이트
+    if (!participant.githubUsername) {
       await prisma.participant.update({
         where: { id: participant.id },
-        data: {
-          githubUsername,
-          ...(participant.email ? {} : { email: normalizedEmail || null }),
-        },
+        data: { githubUsername },
       })
     }
 

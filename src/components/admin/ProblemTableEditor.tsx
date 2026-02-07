@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { format, addDays } from "date-fns";
+import { toKoreaTime } from "@/lib/utils/date";
 
 type ProblemType = "REGULAR" | "FREE" | "REST";
 
@@ -64,6 +65,7 @@ export function ProblemTableEditor({
 
   useEffect(() => {
     const existingMap = new Map(existingProblems.map((p) => [p.dayNumber, p]));
+    const koreaStartDate = toKoreaTime(new Date(startDate));
 
     const initialProblems: ProblemRow[] = Array.from(
       { length: TOTAL_DAYS },
@@ -71,7 +73,7 @@ export function ProblemTableEditor({
         const dayNumber = i + 1;
         const existing = existingMap.get(dayNumber);
         const assignedDate = format(
-          addDays(new Date(startDate), dayNumber - 1),
+          addDays(koreaStartDate, dayNumber - 1),
           "yyyy-MM-dd",
         );
 

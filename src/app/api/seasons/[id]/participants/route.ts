@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db/prisma'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth/options'
+import { isAdminUser } from '@/lib/auth/admin'
 
 export async function GET(
   request: NextRequest,
@@ -33,6 +34,10 @@ export async function POST(
     const session = await getServerSession(authOptions)
     if (!session) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    if (!isAdminUser({ email: session.user?.email })) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
     const { id: seasonId } = await params
@@ -86,6 +91,10 @@ export async function PUT(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    if (!isAdminUser({ email: session.user?.email })) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
+
     const body = await request.json()
     const { participantId, isPaid, status, refundCompleted } = body
 
@@ -113,6 +122,10 @@ export async function DELETE(
     const session = await getServerSession(authOptions)
     if (!session) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    if (!isAdminUser({ email: session.user?.email })) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
     const { searchParams } = new URL(request.url)

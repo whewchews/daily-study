@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db/prisma'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth/options'
+import { isAdminUser } from '@/lib/auth/admin'
+import { getDateForDay, parseKoreaDate } from '@/lib/utils/date'
 
 export async function GET(
   request: NextRequest,
@@ -47,37 +49,26 @@ export async function PUT(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    if (!isAdminUser({ email: session.user?.email })) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
+
     const { id } = await params
     const body = await request.json()
-    const { name, startDate, endDate, entryFee, isActive, status } = body
-    let resolvedStatus = status
-    let resolvedIsActive = isActive
+    const { name, startDate, endDate, entryFee, status } = body
 
-    if (status) {
-      resolvedIsActive = status === 'ACTIVE'
-    } else if (isActive !== undefined) {
-      if (isActive) {
-        resolvedStatus = 'ACTIVE'
-      } else {
-        const currentSeason = await prisma.season.findUnique({
-          where: { id },
-          select: { status: true },
-        })
-        if (currentSeason?.status === 'ACTIVE') {
-          resolvedStatus = 'COMPLETED'
-        }
-      }
-    }
+    // status 필드로 통일, isActive는 status === 'ACTIVE'로 자동 설정
+    const resolvedIsActive = status ? status === 'ACTIVE' : undefined
 
     const season = await prisma.season.update({
       where: { id },
       data: {
         ...(name && { name }),
-        ...(startDate && { startDate: new Date(startDate) }),
-        ...(endDate && { endDate: new Date(endDate) }),
+        ...(startDate && { startDate: parseKoreaDate(startDate) }),
+        ...(endDate && { endDate: parseKoreaDate(endDate) }),
         ...(entryFee !== undefined && { entryFee }),
         ...(resolvedIsActive !== undefined && { isActive: resolvedIsActive }),
-        ...(resolvedStatus && { status: resolvedStatus }),
+        ...(status && { status }),
       },
     })
 
@@ -89,11 +80,10 @@ export async function PUT(
       })
 
       if (problems.length > 0) {
-        const newStartDate = new Date(startDate)
+        const newStartDate = parseKoreaDate(startDate)
         await Promise.all(
           problems.map((problem) => {
-            const assignedDate = new Date(newStartDate)
-            assignedDate.setDate(assignedDate.getDate() + problem.dayNumber - 1)
+            const assignedDate = getDateForDay(newStartDate, problem.dayNumber)
             return prisma.problem.update({
               where: { id: problem.id },
               data: { assignedDate },
@@ -118,6 +108,10 @@ export async function DELETE(
     const session = await getServerSession(authOptions)
     if (!session) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    if (!isAdminUser({ email: session.user?.email })) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
     const { id } = await params

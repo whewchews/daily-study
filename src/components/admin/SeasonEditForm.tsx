@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { format } from "date-fns";
+import { toKoreaTime } from "@/lib/utils/date";
 
 interface SeasonEditFormProps {
   season: {
@@ -25,17 +26,17 @@ export function SeasonEditForm({ season }: SeasonEditFormProps) {
 
   const [name, setName] = useState(season.name);
   const [startDate, setStartDate] = useState(
-    format(new Date(season.startDate), "yyyy-MM-dd"),
+    format(toKoreaTime(new Date(season.startDate)), "yyyy-MM-dd"),
   );
   const [endDate, setEndDate] = useState(
-    format(new Date(season.endDate), "yyyy-MM-dd"),
+    format(toKoreaTime(new Date(season.endDate)), "yyyy-MM-dd"),
   );
   const [entryFee, setEntryFee] = useState(season.entryFee);
 
   const handleCancel = () => {
     setName(season.name);
-    setStartDate(format(new Date(season.startDate), "yyyy-MM-dd"));
-    setEndDate(format(new Date(season.endDate), "yyyy-MM-dd"));
+    setStartDate(format(toKoreaTime(new Date(season.startDate)), "yyyy-MM-dd"));
+    setEndDate(format(toKoreaTime(new Date(season.endDate)), "yyyy-MM-dd"));
     setEntryFee(season.entryFee);
     setIsEditing(false);
     setError("");

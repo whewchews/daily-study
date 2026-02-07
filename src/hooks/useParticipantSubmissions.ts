@@ -23,7 +23,11 @@ export function useParticipantSubmissions(participantId: string) {
     queryKey: ["participantSubmissions", participantId],
     queryFn: async () => {
       const res = await fetch(`/api/participants/${participantId}/submissions`);
-      if (!res.ok) throw new Error("Failed to fetch submissions");
+      if (!res.ok) {
+        if (res.status === 401) throw new Error("로그인이 필요합니다.");
+        if (res.status === 403) throw new Error("조회 권한이 없습니다.");
+        throw new Error("제출 내역을 불러오지 못했습니다.");
+      }
       return res.json();
     },
     staleTime: 5 * 60 * 1000,   // 5분

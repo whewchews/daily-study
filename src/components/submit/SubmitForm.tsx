@@ -24,6 +24,7 @@ import {
   getCodeBlockLanguageOptions,
 } from "@/lib/editor/codeBlockLanguages";
 import { LoginModal } from "@/components/auth/LoginModal";
+import { toKoreaTime } from "@/lib/utils/date";
 
 type ProblemType = "REGULAR" | "FREE" | "REST";
 
@@ -440,9 +441,10 @@ export function SubmitForm({
   const formatProblemDate = (dateInput: string | Date) => {
     const date = new Date(dateInput);
     if (Number.isNaN(date.getTime())) return "";
-    const month = date.getMonth() + 1;
-    const day = date.getDate();
-    const dayOfWeek = ["일", "월", "화", "수", "목", "금", "토"][date.getDay()];
+    const koreaDate = toKoreaTime(date);
+    const month = koreaDate.getMonth() + 1;
+    const day = koreaDate.getDate();
+    const dayOfWeek = ["일", "월", "화", "수", "목", "금", "토"][koreaDate.getDay()];
     return `${month}.${day} (${dayOfWeek})`;
   };
 

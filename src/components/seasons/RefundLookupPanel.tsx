@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useSession } from "next-auth/react";
 import { LoginModal } from "@/components/auth/LoginModal";
 import { useRefundQuery, RefundApiResponse } from "@/hooks/useRefundQuery";
+import { getKoreaNow, getKoreaStartOfDay } from "@/lib/utils/date";
 
 type RefundStatus = "NOT_REGISTERED" | "UNPAID" | "ACTIVE" | "DROPPED";
 
@@ -41,13 +42,11 @@ export function RefundLookupPanel({ seasonId, endDate, isParticipant }: RefundLo
 
   const isAuthenticated = status === "authenticated";
 
-  // 마지막날 2일 전부터 환급액 조회 버튼 표시
+  // 마지막날 2일 전부터 환급액 조회 버튼 표시 (한국 시간 기준)
   const canShowRefundQuery = useMemo(() => {
-    const end = new Date(endDate);
-    const twoDaysBefore = new Date(end);
-    twoDaysBefore.setDate(twoDaysBefore.getDate() - 2);
-    twoDaysBefore.setHours(0, 0, 0, 0);
-    const now = new Date();
+    const endDateObj = new Date(endDate);
+    const twoDaysBefore = getKoreaStartOfDay(new Date(endDateObj.getTime() - 2 * 24 * 60 * 60 * 1000));
+    const now = getKoreaNow();
     return now >= twoDaysBefore;
   }, [endDate]);
 

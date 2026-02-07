@@ -54,7 +54,7 @@ export function ParticipantSubmissionsViewer({
   const router = useRouter();
   const [selectedSubmissionId, setSelectedSubmissionId] = useState<string | null>(null);
 
-  const { data, isLoading: loading } = useParticipantSubmissions(participantId);
+  const { data, isLoading: loading, error } = useParticipantSubmissions(participantId);
   const submissions = useMemo(() => data?.submissions ?? [], [data?.submissions]);
 
   const currentUserEmail = session?.user?.email?.toLowerCase();
@@ -149,6 +149,10 @@ export function ParticipantSubmissionsViewer({
           <div className="w-64 border-r bg-gray-50 overflow-y-auto shrink-0">
             {loading ? (
               <div className="p-4 text-center text-gray-500">Loading...</div>
+            ) : error ? (
+              <div className="p-4 text-center text-red-500">
+                {error.message}
+              </div>
             ) : submissions.length === 0 ? (
               <div className="p-4 text-center text-gray-500">
                 제출된 코드가 없습니다.

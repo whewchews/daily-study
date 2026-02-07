@@ -4,7 +4,7 @@ import { prisma } from '@/lib/db/prisma'
 export async function GET() {
   try {
     const seasons = await prisma.season.findMany({
-      where: { isActive: true },
+      where: { status: 'ACTIVE' },
       orderBy: { seasonNumber: 'desc' },
       include: {
         problems: {

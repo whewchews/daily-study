@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db/prisma'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth/options'
+import { isAdminUser } from '@/lib/auth/admin'
 import { calculateRefund } from '@/lib/utils/refund'
 
 export async function GET(
@@ -12,6 +13,10 @@ export async function GET(
     const session = await getServerSession(authOptions)
     if (!session) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    if (!isAdminUser({ email: session.user?.email })) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
     const { seasonId } = await params

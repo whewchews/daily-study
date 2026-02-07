@@ -51,7 +51,7 @@ export function getDayNumber(startDate: Date, currentDate: Date): number {
 
 export function getDateForDay(startDate: Date, dayNumber: number): Date {
   const koreaStart = startOfDay(toKoreaTime(startDate))
-  return addDays(koreaStart, dayNumber - 1)
+  return fromKoreaTime(addDays(koreaStart, dayNumber - 1))
 }
 
 export function parseKoreaDate(dateString: string): Date {

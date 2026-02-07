@@ -19,7 +19,7 @@ export function getSeasonStatusKey(season: {
   if (season.status === 'COMPLETED') {
     return 'COMPLETED'
   }
-  if (season.isActive || season.status === 'ACTIVE') {
+  if (season.status === 'ACTIVE') {
     return 'ACTIVE'
   }
   return 'UPCOMING'

@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db/prisma'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth/options'
+import { isAdminUser } from '@/lib/auth/admin'
+import { parseKoreaDate } from '@/lib/utils/date'
 import { ProblemType } from '@prisma/client'
 
 export async function GET(
@@ -31,6 +33,10 @@ export async function POST(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    if (!isAdminUser({ email: session.user?.email })) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
+
     const { id: seasonId } = await params
     const body = await request.json()
     const { title, url, assignedDate, dayNumber, problemType, isPractice } = body
@@ -48,7 +54,7 @@ export async function POST(
         seasonId,
         title,
         url,
-        assignedDate: new Date(assignedDate),
+        assignedDate: parseKoreaDate(assignedDate),
         dayNumber,
         problemType: problemType || 'REGULAR',
         isPractice: isPractice || false,
@@ -71,6 +77,10 @@ export async function PUT(
     const session = await getServerSession(authOptions)
     if (!session) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    if (!isAdminUser({ email: session.user?.email })) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
     const { id: seasonId } = await params
@@ -101,7 +111,7 @@ export async function PUT(
           update: {
             title: problem.title,
             url: problem.url || null,
-            assignedDate: new Date(problem.assignedDate),
+            assignedDate: parseKoreaDate(problem.assignedDate),
             problemType: problem.problemType,
             isPractice: problem.isPractice || false,
           },
@@ -110,7 +120,7 @@ export async function PUT(
             dayNumber: problem.dayNumber,
             title: problem.title,
             url: problem.url || null,
-            assignedDate: new Date(problem.assignedDate),
+            assignedDate: parseKoreaDate(problem.assignedDate),
             problemType: problem.problemType,
             isPractice: problem.isPractice || false,
           },
@@ -133,6 +143,10 @@ export async function DELETE(
     const session = await getServerSession(authOptions)
     if (!session) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    if (!isAdminUser({ email: session.user?.email })) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
     const { searchParams } = new URL(request.url)

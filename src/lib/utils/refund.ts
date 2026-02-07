@@ -39,11 +39,7 @@ export function calculateRefund(
 
   // Identify problems that are in the past
   const pastProblems = problems.filter(p => {
-    // Ensure problem date is treated as start of day for comparison
-    const pDate = new Date(p.assignedDate)
-    // If we assume assignedDate is already midnight or we just want to compare dates:
-    // We compare with 'today'.
-    // If pDate < today, it's strictly in the past (yesterday or before).
+    const pDate = getKoreaStartOfDay(new Date(p.assignedDate))
     return pDate < today
   })
 

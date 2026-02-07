@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { ProblemSubmissionsViewer } from '@/components/seasons/ProblemSubmissionsViewer'
 import { ParticipantSubmissionsViewer } from '@/components/dashboard/ParticipantSubmissionsViewer'
+import { getKoreaNow, getKoreaStartOfDay, toKoreaTime } from '@/lib/utils/date'
 
 type ProblemType = 'REGULAR' | 'FREE' | 'REST'
 
@@ -67,24 +68,22 @@ export function SubmissionGrid({
     setSelectedProblem(initialProblemSelection)
   }, [initialProblemSelection])
 
-  // Get today's date at midnight for comparison
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
+  // 한국 시간 기준 오늘 자정 (UTC)
+  const todayKoreaStart = useMemo(() => getKoreaStartOfDay(getKoreaNow()), [])
 
-  // Format date helper
+  // Format date helper (한국 시간 기준)
   const formatDate = (dateInput: string | Date) => {
-    const date = new Date(dateInput)
-    const month = date.getMonth() + 1
-    const day = date.getDate()
-    const dayOfWeek = ['일', '월', '화', '수', '목', '금', '토'][date.getDay()]
+    const koreaDate = toKoreaTime(new Date(dateInput))
+    const month = koreaDate.getMonth() + 1
+    const day = koreaDate.getDate()
+    const dayOfWeek = ['일', '월', '화', '수', '목', '금', '토'][koreaDate.getDay()]
     return `${month}.${day} (${dayOfWeek})`
   }
 
-  // Check if a problem date is in the past (yesterday or before)
+  // Check if a problem date is in the past (yesterday or before, 한국 시간 기준)
   const isDatePast = (dateInput: string | Date) => {
-    const date = new Date(dateInput)
-    date.setHours(0, 0, 0, 0)
-    return date < today
+    const problemDateStart = getKoreaStartOfDay(new Date(dateInput))
+    return problemDateStart < todayKoreaStart
   }
 
   // 휴식일 제외한 제출 가능 문제 수
